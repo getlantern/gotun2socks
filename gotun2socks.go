@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getlantern/gotun2socks/internal/packet"
 	"github.com/yinghuocho/gosocks"
-	"github.com/yinghuocho/gotun2socks/internal/packet"
 )
 
 const (
@@ -88,7 +88,7 @@ func (t2s *Tun2Socks) Stop() {
 	for _, udpTrack := range t2s.udpConnTrackMap {
 		close(udpTrack.quitByOther)
 	}
-	t2s.wg.Wait()
+	// t2s.wg.Wait()
 }
 
 func (t2s *Tun2Socks) Run() {

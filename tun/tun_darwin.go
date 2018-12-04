@@ -51,10 +51,19 @@ func (dev *utunDev) Close() error {
 
 var sockaddrCtlSize uintptr = 32
 
-func OpenTunDevice(name, addr, gw, mask string, dns []string) (io.ReadWriteCloser, error) {
-	fd, err := syscall.Socket(syscall.AF_SYSTEM, syscall.SOCK_DGRAM, 2)
+func OpenTunDevice(name, addr, gw, mask string) (io.ReadWriteCloser, error) {
+	fd, err := OpenAndRegisterTunDevice(name, addr, gw, mask)
 	if err != nil {
 		return nil, err
+	}
+
+	return WrapTunDevice(fd)
+}
+
+func OpenAndRegisterTunDevice(name, addr, gw, mask string) (int, error) {
+	fd, err := syscall.Socket(syscall.AF_SYSTEM, syscall.SOCK_DGRAM, 2)
+	if err != nil {
+		return 0, err
 	}
 
 	var ctlInfo = &struct {
@@ -64,7 +73,7 @@ func OpenTunDevice(name, addr, gw, mask string, dns []string) (io.ReadWriteClose
 	copy(ctlInfo.ctlName[:], []byte(appleUTUNCtl))
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(appleCTLIOCGINFO), uintptr(unsafe.Pointer(ctlInfo)))
 	if errno != 0 {
-		return nil, fmt.Errorf("error in syscall.Syscall(syscall.SYS_IOTL, ...): %v", errno)
+		return 0, fmt.Errorf("error in syscall.Syscall(syscall.SYS_IOTL, ...): %v", errno)
 	}
 	addrP := unsafe.Pointer(&sockaddrCtl{
 		scLen:    uint8(sockaddrCtlSize),
@@ -76,31 +85,48 @@ func OpenTunDevice(name, addr, gw, mask string, dns []string) (io.ReadWriteClose
 	})
 	_, _, errno = syscall.RawSyscall(syscall.SYS_CONNECT, uintptr(fd), uintptr(addrP), uintptr(sockaddrCtlSize))
 	if errno != 0 {
-		return nil, fmt.Errorf("error in syscall.RawSyscall(syscall.SYS_CONNECT, ...): %v", errno)
+		return 0, fmt.Errorf("error in syscall.RawSyscall(syscall.SYS_CONNECT, ...): %v", errno)
 	}
 
+	ifName, err := getInterfaceName(fd)
+	if err != nil {
+		return 0, err
+	}
+	cmd := exec.Command("ifconfig", ifName, "inet", addr, gw, "netmask", mask, "mtu", "1500", "up")
+	err = cmd.Run()
+	if err != nil {
+		syscall.Close(fd)
+		return 0, err
+	}
+
+	return fd, nil
+}
+
+func WrapTunDevice(fd int) (io.ReadWriteCloser, error) {
+	ifName, err := getInterfaceName(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	dev := &utunDev{
+		f: os.NewFile(uintptr(fd), ifName),
+	}
+	copy(dev.wBuf[:], []byte{0, 0, 0, 2})
+	return dev, nil
+}
+
+func getInterfaceName(fd int) (string, error) {
 	var ifName struct {
 		name [16]byte
 	}
 	ifNameSize := uintptr(16)
-	_, _, errno = syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(fd),
+	_, _, errno := syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(fd),
 		2, /* #define SYSPROTO_CONTROL 2 */
 		2, /* #define UTUN_OPT_IFNAME 2 */
 		uintptr(unsafe.Pointer(&ifName)),
 		uintptr(unsafe.Pointer(&ifNameSize)), 0)
 	if errno != 0 {
-		return nil, fmt.Errorf("error in syscall.Syscall6(syscall.SYS_GETSOCKOPT, ...): %v", errno)
+		return "", fmt.Errorf("error in syscall.Syscall6(syscall.SYS_GETSOCKOPT, ...): %v", errno)
 	}
-	cmd := exec.Command("ifconfig", string(ifName.name[:ifNameSize-1]), "inet", addr, gw, "netmask", mask, "mtu", "1500", "up")
-	err = cmd.Run()
-	if err != nil {
-		syscall.Close(fd)
-		return nil, err
-	}
-
-	dev := &utunDev{
-		f: os.NewFile(uintptr(fd), string(ifName.name[:ifNameSize-1])),
-	}
-	copy(dev.wBuf[:], []byte{0, 0, 0, 2})
-	return dev, nil
+	return string(ifName.name[:ifNameSize-1]), nil
 }

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/yinghuocho/gotun2socks"
-	"github.com/yinghuocho/gotun2socks/tun"
+	"github.com/getlantern/gotun2socks"
+	"github.com/getlantern/gotun2socks/tun"
 )
 
 func main() {
@@ -38,19 +38,21 @@ func main() {
 	}
 	tun := gotun2socks.New(f, localSocksAddr, dnsServers, publicOnly, enableDnsCache)
 
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-	go func() {
-		s := <-ch
-		switch s {
-		default:
-			tun.Stop()
-		}
-	}()
+	if false {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch,
+			syscall.SIGHUP,
+			syscall.SIGINT,
+			syscall.SIGTERM,
+			syscall.SIGQUIT)
+		go func() {
+			s := <-ch
+			switch s {
+			default:
+				tun.Stop()
+			}
+		}()
+	}
 
 	tun.Run()
 }

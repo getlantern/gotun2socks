@@ -11,7 +11,7 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/yinghuocho/gosocks"
-	"github.com/yinghuocho/gotun2socks/internal/packet"
+	"github.com/getlantern/gotun2socks/internal/packet"
 )
 
 type udpPacket struct {
