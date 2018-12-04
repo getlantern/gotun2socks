@@ -10,7 +10,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/yinghuocho/gosocks"
+	"github.com/getlantern/gosocks"
 	"github.com/getlantern/gotun2socks/internal/packet"
 )
 

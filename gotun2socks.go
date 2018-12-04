@@ -7,8 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getlantern/gosocks"
 	"github.com/getlantern/gotun2socks/internal/packet"
-	"github.com/yinghuocho/gosocks"
+	"github.com/getlantern/netx"
 )
 
 const (
@@ -17,8 +18,9 @@ const (
 
 var (
 	localSocksDialer *gosocks.SocksDialer = &gosocks.SocksDialer{
-		Auth:    &gosocks.AnonymousClientAuthenticator{},
-		Timeout: 1 * time.Second,
+		Auth:        &gosocks.AnonymousClientAuthenticator{},
+		Timeout:     1 * time.Second,
+		DialTimeout: netx.DialTimeout,
 	}
 
 	_, ip1, _ = net.ParseCIDR("10.0.0.0/8")
